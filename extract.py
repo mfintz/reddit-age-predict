@@ -13,7 +13,7 @@ reddit = praw.Reddit(client_id='E8sXdgKwMzysNQ',
 
 
 subreddit = reddit.subreddit('teenagers')
-top_subreddit = subreddit.hot(limit = 9999)
+top_subreddit = subreddit.new(limit = 9999)
 for index,submission in enumerate(top_subreddit):
     output.write(str(index))
     output.write(":")
