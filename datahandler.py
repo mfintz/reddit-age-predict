@@ -221,7 +221,7 @@ def handleAges(all_ages):
 
 
 
-# gets a directory , runs through all it's json files and making new text file with just the body
+# gets a directory , runs through all it's json files and making new text file with just the author and the body
 def handleJson(input_path):
     dir_files = os.listdir(input_path)
 
@@ -234,20 +234,20 @@ def handleJson(input_path):
             item = json.loads(line)
             # Submissions
             if 'selftext' in item:
-                if item['selftext'] != '[removed]' and len(item['selftext'])>0:
-                    print(item['selftext'].replace("\n",""), file=sents)
-                    # sents.write(item['selftext'])
+                if item['selftext'] != '[removed]' and len(item['selftext'])>0 and item['author'] is not None:
+                    # print('[{}] {}'.format(item['author'], item['selftext'].replace("\n",""), file=sents))
+                    sents.write('[{}] {}\n'.format(item['author'], item['selftext'].replace("\n","")))
             # Comments
             elif 'body' in item:
-                if item['body'] != '[removed]' and len(item['body'])>0:
-                    print(item['body'].replace("\n",""), file=sents)
-
+                if item['body'] != '[removed]' and len(item['body'])>0 and item['author'] is not None:
+                    # print('[{}] {}'.format(item['author'], item['body'].replace("\n",""), file=sents))
+                    sents.write('[{}] {}\n'.format(item['author'], item['body'].replace("\n", "")))
         sents.close()
 
 
 
 # gets the json directory name
-# handleJson("jsons")
+handleJson("jsons")
 
 
 
@@ -334,7 +334,7 @@ def splitSent(input_path):
         sents.close()
 
 
-splitSent("jsons\\texts")
+# splitSent("jsons\\texts")
 
 print()
 debug.close()

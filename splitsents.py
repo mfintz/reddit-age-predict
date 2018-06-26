@@ -4,6 +4,7 @@ from nltk.tokenize import TweetTokenizer, sent_tokenize
 import os
 import codecs
 import re
+from random import shuffle
 
 
 
@@ -105,29 +106,31 @@ def nltkSplitSents(input_path):
             # source file
             src = codecs.open(input_path + "\\" + file, 'r',"utf-8")
 
-            final_text = ""
-            for line in src:
-                final_text += line
-
-            sent_text = nltk.sent_tokenize(final_text)
-
-            first_sentence = True
-            for sent in sent_text:
-                if first_sentence:
-                    first_sentence = False
-                else:
-                    sents.write('\r\n')
-                sents.write(sent)
+            for sent in src:
+                author = sent[sent.find('['):sent.find('] ')+2]
+                sent_text = nltk.sent_tokenize(sent[sent.find('] ')+2:])
+                for sent in sent_text:
+                    sents.write('{}{}\n'.format(author,sent))
 
 
-
+            # final_text = ""
+            # for line in src:
+            #     final_text += line
+            #
+            # sent_text = nltk.sent_tokenize(final_text)
+            #
+            # first_sentence = True
+            # for sent in sent_text:
+            #     if first_sentence:
+            #         first_sentence = False
+            #     else:
+            #         sents.write('\r\n')
+            #     sents.write(sent)
             sents.close()
 
 
-
-def cleanSents(input_path):
+def cleanSents(input_path):   #check my cleaning method
     dir_files = os.listdir(input_path)
-
 
     if not os.path.exists(input_path + "\\cleanSents\\"):
         os.makedirs(input_path + "\\cleanSents\\")
@@ -143,25 +146,51 @@ def cleanSents(input_path):
 
             clean_lines = []
             for line in src:
-                newline = re.sub(url_reg, "", line)
+                author = line[line.find('['):line.find('] ') + 2]
+                newline = re.sub(url_reg, "", line[line.find('] ')+2:])
                 newline = re.sub(url_reg2, "", newline)
                 newline.replace("\r","")
-                clean_lines.append(newline)
+                # clean_lines.append(author+newline)
+                sents.write('{}{}'.format(author,newline))
 
-
-
-
-            first_sentence = True
-            for sent in clean_lines:
-                # if first_sentence:
-                #     first_sentence = False
-                # else:
-                #     sents.write('\r\n')
-                sents.write(sent)
-
-
+            # first_sentence = True
+            # for sent in clean_lines:
+            #     # if first_sentence:
+            #     #     first_sentence = False
+            #     # else:
+            #     #     sents.write('\r\n')
+            #     sents.write(sent)
 
             sents.close()
+
+
+def mergeFiles(input_path):
+    dir_files = os.listdir(input_path)
+
+    if not os.path.exists(input_path + "mergedFiles\\"):
+        os.makedirs(input_path + "mergedFiles\\")
+
+    cat_reg = re.compile('(comment|submission).txt.splitsentencesNLTK.clean')
+    categories = set([cat_reg.split(file)[0] for file in dir_files])
+
+    for i in categories:
+        reg = re.compile('{}.*\.clean'.format(i))
+        cat_files = [file for file in dir_files if re.match(reg, file) ]
+        if not (len(cat_files)):
+            continue
+        sents = []
+        for file in cat_files:
+            # source file
+            src_file = codecs.open('{}{}'.format(input_path, file), 'r','utf-8')
+            l = [line for line in src_file]
+            sents.extend(l)
+        shuffle(sents)                           # MATAN - should we shuffle before saving into file??
+
+        # new file
+        merged_file = codecs.open('{}\\mergedFiles\\{}.txt.splitsentencesNLTK.clean.merged'.format(input_path, i), 'w',
+                                  'utf-8')
+        merged_file.writelines(sents)
+        merged_file.close()
 
 
 
@@ -170,4 +199,6 @@ def cleanSents(input_path):
 
 # nltkSplitSents("jsons\\texts")
 
-cleanSents("jsons\\texts\\splitsentsNLTKstyle")
+# cleanSents("jsons\\texts\\splitsentsNLTKstyle")
+
+mergeFiles("jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\")
