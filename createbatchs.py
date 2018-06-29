@@ -95,7 +95,7 @@ def from_batch_to_dataset(batch_df):
     dataset['text'] = batch_df['batch'].apply(lambda b: handle_batch(b)[1])
     dataset['avg_sent'] = batch_df['batch'].apply(lambda b: handle_batch(b)[0])
     dataset.drop(columns=['batch'], inplace=True)
-    return dataset
+    return dataset.values
 
 
 
@@ -120,9 +120,9 @@ batch_df = pickle.load(open('batch_df.p', "rb"))
 print(batch_df.head())
 
 dataset = from_batch_to_dataset(batch_df)
-print(dataset.head())
+print(dataset)
 
-print(dataset.values)
+
 
 
 # sampled_df = down_sample(dataset)
