@@ -84,10 +84,10 @@ def handle_batch(batch):
     text = ''
     for t in batch:
         sum_len += t[1]
-        text += ' '+t[2]
+        text += ' '+t[2][:-1]
     if len(batch):
         avg_sent = sum_len/len(batch)
-    return (avg_sent, text)
+    return (avg_sent, text[1:])
 
 
 def from_batch_to_dataset(batch_df):
@@ -109,9 +109,14 @@ def from_batch_to_dataset(batch_df):
 data = pickle.load(open('data.p', "rb"))
 print(data.head())
 
-# batch_df = create_batches(data, 2000)
+#### comment when loading dump file########
+# batch_df = create_batches(data, 500)
 # pickle.dump(batch_df, open('batch_df.p', 'wb'))
+###############################################
+
+#############Uncomment to load dump file##########
 batch_df = pickle.load(open('batch_df.p', "rb"))
+##################################################
 print(batch_df.head())
 
 dataset = from_batch_to_dataset(batch_df)
