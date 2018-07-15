@@ -19,7 +19,7 @@ from sklearn import svm, cross_validation, metrics, naive_bayes, tree, neighbors
 from sklearn import feature_extraction
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.multiclass import OneVsRestClassifier, OneVsOneClassifier
-
+from sklearn.feature_selection import SelectKBest, chi2
 from en_shell_nouns import SHELL_NOUNS
 from en_function_words import FUNCTION_WORDS
 
@@ -412,7 +412,10 @@ dir_files = os.listdir(BATCHED_FILES_LOCATION)
 
 for file in dir_files:
     n_age = []
-    unigrams_dict, bigrams_dict, trigrams_dict, total_num_unigrams, total_num_bigrams, total_num_trigrams = analyze_text(BATCHED_FILES_LOCATION + file)
+    if file.__contains__(".Equally"):
+        unigrams_dict, bigrams_dict, trigrams_dict, total_num_unigrams, total_num_bigrams, total_num_trigrams = analyze_text(BATCHED_FILES_LOCATION + file)
+    else:
+        unigrams_dict, bigrams_dict, trigrams_dict, total_num_unigrams, total_num_bigrams, total_num_trigrams = analyze_text(BATCHED_FILES_LOCATION + file + ".Equally")
     n_age.append(unigrams_dict)
     n_age.append(bigrams_dict)
     n_age.append(trigrams_dict)
@@ -421,8 +424,11 @@ for file in dir_files:
     n_age.append(total_num_trigrams)
     n_grams_all_ages.append(n_age)
 
+top_500_in_dict = (sorted(analyze_text.unigrams_dict.items(), key=operator.itemgetter(1), reverse=True)[:500])
+
+
 all_mighty_dict_size = len(analyze_text.unigrams_dict)
-feature_len = 6 + all_mighty_dict_size
+feature_len = 6 + len(top_500_in_dict)
 feat_vec_mat = np.zeros((len(all_ages_batched[0])*NUM_OF_CLASSES, feature_len))
 
 
@@ -430,14 +436,16 @@ feat_vec_mat = np.zeros((len(all_ages_batched[0])*NUM_OF_CLASSES, feature_len))
 
 REFERENCES = ["I", "me", "mine", "you", "your", "we", "our", "him", "her", "they"]
 
+
+
 def featureVecotrize(batch):
     # global debug_procces_words
     tknzr = TweetTokenizer()
-    vect = [0] * feature_len
+    vect = [0] * (feature_len - 6)
     tokenized_batch = tknzr.tokenize(batch)
     sent_text = nltk.sent_tokenize(batch)
-    top_500_in_dict = (sorted(analyze_text.unigrams_dict.items(), key=operator.itemgetter(1), reverse=True)[:500])
-    ordered_dict_listed = list(OrderedDict(analyze_text.unigrams_dict).keys())
+    # ordered_dict_listed = tuple(OrderedDict(analyze_text.unigrams_dict).keys())
+    ordered_dict_listed = tuple(OrderedDict(top_500_in_dict).keys())
     len_sum = 0
     num_of_words = 0
     shell_nouns_count = 0
@@ -465,12 +473,12 @@ def featureVecotrize(batch):
 
     avg_word = len_sum/num_of_words
 
-    vect.insert(all_mighty_dict_size,avg_sent)
-    vect.insert(all_mighty_dict_size + 1,avg_word)
-    vect.insert(all_mighty_dict_size + 2,shell_nouns_count)
-    vect.insert(all_mighty_dict_size + 3,references_count)
-    vect.insert(all_mighty_dict_size + 4,function_words_count)
-    vect.insert(all_mighty_dict_size + 5,unique_words)
+    vect.append(avg_sent)
+    vect.append(avg_word)
+    vect.append(shell_nouns_count/len(all_ages_batched[0]))
+    vect.append(references_count/len(all_ages_batched[0]))
+    vect.append(function_words_count/len(all_ages_batched[0]))
+    vect.append(unique_words/len(all_ages_batched[0]))
     # print(avg_sent,avg_word,shell_nouns_count,references_count,function_words_count,unique_words,file=debug_file)
 
     return vect
@@ -481,17 +489,19 @@ def featureVecotrize(batch):
 
 
 
-
+vect_num = 0
 # fill feature matrix
 for age,batch_age in enumerate(all_ages_batched):
     # all_mighty_dict,bigrams_dict, trigrams_dict, total_num_unigrams, total_num_bigrams, total_num_trigrams = analyze_text("jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\mergedFiles\\batched\\" + str(age + 13) + ".txt.splitsentencesNLTK.clean.merged.batched")
     for batch_index,batch in enumerate(batch_age):
         vect = featureVecotrize(batch)
+        vect_num += 1
+        print("vect #", vect_num)
         for ft_index in range(len(vect)):
             feat_vec_mat[batch_index + len(all_ages_batched[0])*age][ft_index] = vect[ft_index]
 
 
-
+X_new = SelectKBest(chi2, k=20).fit_transform(feat_vec_mat, train_labels)
 
 
 # 10-fold cross validation
@@ -512,10 +522,15 @@ for train_ind, test_ind in kf:
 
     # Train the classifiers on 9/10 of the samples
     clf_SVC.fit(feat_vec_mat[train_ind, :], curr_train_labels)
+    print("fitting SVM\n")
     clf_NB.fit(feat_vec_mat[train_ind, :], curr_train_labels)
+    print("fitting NB\n")
     clf_DT.fit(feat_vec_mat[train_ind, :], curr_train_labels)
+    print("fitting DT\n")
     clf_KNN.fit(feat_vec_mat[train_ind, :], curr_train_labels)
+    print("fitting KNN\n")
     regr.fit(feat_vec_mat[train_ind, :], curr_train_labels)
+    print("fitting LR\n")
 
     # Test the classifiers on the remaining 1/10 of the samples
     # SVC prediction
