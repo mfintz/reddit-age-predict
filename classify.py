@@ -24,7 +24,7 @@ from en_shell_nouns import SHELL_NOUNS
 from en_function_words import FUNCTION_WORDS
 
 NUM_OF_SAMPLES = 1000
-BATCH_SIZE = 100
+BATCH_SIZE = 1000
 NUM_OF_CLASSES = 8
 MERGED_FILES_LOCATION = "jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\mergedFiles\\"
 BATCHED_FILES_LOCATION = "jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\mergedFiles\\batched\\"
@@ -46,54 +46,54 @@ def getInd(src:list,num):
             return ind
 
 # from each class , choose NUM_OF_SAMPLES  - each sample is a batch at size BATCH_SIZE (BATCH_SIZE sentences)
-def pickSamples(input_path):
-    dir_files = os.listdir(input_path)
-    tknzr = TweetTokenizer()
-
-    if os.path.exists(input_path + "\\batched\\"):
-        shutil.rmtree(input_path + "\\batched\\")
-        os.makedirs(input_path + "\\batched\\")
-    else:
-        os.makedirs(input_path + "\\batched\\")
-    for file in dir_files:
-        batches = []
-        if file.endswith(".merged"):
-            # saving to file , mainly for debug
-
-            # new file - each line at the file will contain a batch (certain number of sentences)
-            sents = codecs.open(input_path + "\\batched\\" + file + ".batched", 'w', "utf-8")
-            # source file
-            src = codecs.open(input_path + "\\" + file, 'r',"utf-8")
-
-            file_len = 0
-            batch_ind = 0
-            all_batch_ind = 0
-            for line in src:
-                file_len += 1
-                if file_len == 99242:
-                    print()
-
-            t = [i for i in range(file_len)]
-
-            num_of_possible_batches = int(file_len / BATCH_SIZE)
-
-            # generate a list (of lists) holding the lines to be batched
-            for i in range(num_of_possible_batches):
-                # choose sentences indices from file, uniformly
-                indices_to_choose = sorted(choice(t, BATCH_SIZE, replace=False))
-                batches.append(indices_to_choose)
-                removeIndices(t, indices_to_choose)
-
-            batched_lines = [""]*num_of_possible_batches
-            for index, line in enumerate(src):
-                current_batch_line_number = getInd(batches,index)
-                batched_lines[current_batch_line_number].join(line)
-
-
-            for i in range(len(batched_lines)):
-                sents.write(batched_lines[i])
-
-            src.close()
+# def pickSamples(input_path):
+#     dir_files = os.listdir(input_path)
+#     tknzr = TweetTokenizer()
+#
+#     if os.path.exists(input_path + "\\batched\\"):
+#         shutil.rmtree(input_path + "\\batched\\")
+#         os.makedirs(input_path + "\\batched\\")
+#     else:
+#         os.makedirs(input_path + "\\batched\\")
+#     for file in dir_files:
+#         batches = []
+#         if file.endswith(".merged"):
+#             # saving to file , mainly for debug
+#
+#             # new file - each line at the file will contain a batch (certain number of sentences)
+#             sents = codecs.open(input_path + "\\batched\\" + file + ".batched", 'w', "utf-8")
+#             # source file
+#             src = codecs.open(input_path + "\\" + file, 'r',"utf-8")
+#
+#             file_len = 0
+#             batch_ind = 0
+#             all_batch_ind = 0
+#             for line in src:
+#                 file_len += 1
+#                 if file_len == 99242:
+#                     print()
+#
+#             t = [i for i in range(file_len)]
+#
+#             num_of_possible_batches = int(file_len / BATCH_SIZE)
+#
+#             # generate a list (of lists) holding the lines to be batched
+#             for i in range(num_of_possible_batches):
+#                 # choose sentences indices from file, uniformly
+#                 indices_to_choose = sorted(choice(t, BATCH_SIZE, replace=False))
+#                 batches.append(indices_to_choose)
+#                 removeIndices(t, indices_to_choose)
+#
+#             batched_lines = [""]*num_of_possible_batches
+#             for index, line in enumerate(src):
+#                 current_batch_line_number = getInd(batches,index)
+#                 batched_lines[current_batch_line_number].join(line)
+#
+#
+#             for i in range(len(batched_lines)):
+#                 sents.write(batched_lines[i])
+#
+#             src.close()
 
 
 # pickSamples("jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\mergedFiles\\")
@@ -164,8 +164,8 @@ def getBatches(input_path, shortest):
 
             count = 0
             for line in src:
-                if len(line) < 200:
-                    continue
+                # if len(line) < 200:
+                #     continue
                 batch.append(line)
                 sents.write(line)
                 count += 1
@@ -186,17 +186,58 @@ def makeWordsBatches(input_path):
         os.makedirs(input_path + "\\batched\\")
     else:
         os.makedirs(input_path + "\\batched\\")
+    master_of_batches = []
     for file in dir_files:
         batches = []
         if file.endswith(".merged"):
+            # saving to file , mainly for debug
+
+            # new file - each line at the file will contain a batch (certain number of sentences)
+            sents = codecs.open(input_path + "\\batched\\" + file + ".batched", 'w', "utf-8")
+            # source file
             src = codecs.open(input_path + "\\" + file, 'r', "utf-8")
 
-            # for line in src:
+            # tokenize , without ","
+            source_text = []
+            # exclude = set(string.punctuation)
+            word_count = 0
+            for line in src:
+                tokenized = line.replace(",", "").split()
+                if len(tokenized) > 0:
+                    source_text.append(tokenized)
+                    word_count += len(tokenized)
+            shuffle(source_text)
 
+            # source file's text is now shuffled so we can choose consecutive BATCH_SIZE of lines
 
+            num_of_possible_batches = int(word_count / BATCH_SIZE)
 
-    return shortest
+            if num_of_possible_batches < shortest:
+                shortest = num_of_possible_batches
 
+            row = []
+            row_len = 0
+            for i in range(len(source_text)):
+                if row_len < BATCH_SIZE:
+                    row_len += len(source_text[i])
+                    row.append(" ".join(source_text[i]))
+                else:
+                    batches.append(row)
+                    row = []
+                    row_len = 0
+                    row.append(" ".join(source_text[i]))
+                    row_len += len(source_text[i])
+
+            str_batches = []
+            for b in batches:
+                cur = " ".join(b).replace("\n", "").replace("\r", "")
+                sents.write(cur)
+                sents.write("\n")
+                str_batches.append(cur)
+                print("current batch size:", len(cur.split()))
+            master_of_batches.append(str_batches)
+
+    return master_of_batches
 
 
 def creatPlot(info):
@@ -376,22 +417,21 @@ analyze_text.total_num_trigrams = 0
 # pickle.dump(all_ages_batched, open('all_ages_batched.p', 'wb'))
 
 # use this line when working only , to use previous pickle. otherwise , comment it and uncomment previous lines (not pickle)
-all_ages_batched = pickle.load(open('all_ages_batched.p', "rb"))
+# all_ages_batched = pickle.load(open('all_ages_batched.p', "rb"))
 #######################################################################################################
 
 
 ############################### WORDS BATCHES #####################################################
-# shortest_batch = makeWordsBatches("jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\mergedFiles\\")
-# print(shortest_batch)
-# all_ages_batched = getBatches("jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\mergedFiles\\batched",shortest_batch)
+master_of_batches = makeWordsBatches("jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\mergedFiles\\")
+shortest_batch = min([len(master_of_batches[i]) for i in range(len(master_of_batches))])
+print(shortest_batch)
+all_ages_batched = getBatches("jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\mergedFiles\\batched",shortest_batch)
 
 # pickle.dump(all_ages_batched, open('all_ages_batched.p', 'wb'))
 
 # use this line when working only , to use previous pickle. otherwise , comment it and uncomment previous lines (not pickle)
 # all_ages_batched = pickle.load(open('all_ages_batched.p', "rb"))
 #######################################################################################################
-
-
 
 
 
@@ -424,7 +464,7 @@ for file in dir_files:
     n_age.append(total_num_trigrams)
     n_grams_all_ages.append(n_age)
 
-top_500_in_dict = (sorted(analyze_text.unigrams_dict.items(), key=operator.itemgetter(1), reverse=True)[:500])
+top_500_in_dict = (sorted(analyze_text.unigrams_dict.items(), key=operator.itemgetter(1), reverse=True)[:50000])
 
 
 all_mighty_dict_size = len(analyze_text.unigrams_dict)
