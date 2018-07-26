@@ -24,7 +24,7 @@ from en_shell_nouns import SHELL_NOUNS
 from en_function_words import FUNCTION_WORDS
 
 NUM_OF_SAMPLES = 1000
-BATCH_SIZE = 1000
+BATCH_SIZE = 1500
 NUM_OF_CLASSES = 8
 MERGED_FILES_LOCATION = "jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\mergedFiles\\"
 BATCHED_FILES_LOCATION = "jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\mergedFiles\\batched\\"
@@ -436,7 +436,7 @@ all_ages_batched = getBatches("jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\me
 
 
 # 19 isn't merged with 20 for now
-train_labels = np.asarray([13]*NUM_OF_SAMPLES +
+train_labels = np.asarray([13]*len(all_ages_batched[0]) +
                            [14]*len(all_ages_batched[0]) +
                            [15]*len(all_ages_batched[0]) +
                            [16]*len(all_ages_batched[0]) +
@@ -464,7 +464,7 @@ for file in dir_files:
     n_age.append(total_num_trigrams)
     n_grams_all_ages.append(n_age)
 
-top_500_in_dict = (sorted(analyze_text.unigrams_dict.items(), key=operator.itemgetter(1), reverse=True)[:50000])
+top_500_in_dict = (sorted(analyze_text.unigrams_dict.items(), key=operator.itemgetter(1), reverse=True))
 
 
 all_mighty_dict_size = len(analyze_text.unigrams_dict)
@@ -541,20 +541,29 @@ for age,batch_age in enumerate(all_ages_batched):
             feat_vec_mat[batch_index + len(all_ages_batched[0])*age][ft_index] = vect[ft_index]
 
 
-X_new = SelectKBest(chi2, k=20).fit_transform(feat_vec_mat, train_labels)
+# X_new = SelectKBest(chi2, k=20).fit_transform(feat_vec_mat, train_labels)
 
 
 # 10-fold cross validation
 kf = cross_validation.KFold(len(all_ages_batched)*len(all_ages_batched[0]), n_folds=10, shuffle=True)
 avg_acc_SVC = avg_acc_NB = avg_acc_DT = avg_acc_KNN = avg_acc_regr = avg_r2_regr = mae_regr = 0
+avg_acc_lasso_regr = avg_r2_lasso_regr = mae_lasso_regr = avg_acc_ridge_regr = avg_r2_ridge_regr = mae_ridge_regr = 0
+
+alpha_lasso = 0.1
+alpha_ridge = .5
 
 for train_ind, test_ind in kf:
 
     clf_SVC = OneVsOneClassifier(svm.LinearSVC())
     clf_NB = OneVsOneClassifier(naive_bayes.MultinomialNB())
-    clf_DT = OneVsOneClassifier(tree.DecisionTreeClassifier())
-    clf_KNN = OneVsOneClassifier(neighbors.KNeighborsClassifier())
+    # clf_DT = OneVsOneClassifier(tree.DecisionTreeClassifier())
+    # clf_KNN = OneVsOneClassifier(neighbors.KNeighborsClassifier())
     regr = linear_model.LinearRegression()
+
+
+    ridge_regr = linear_model.Ridge(alpha=alpha_ridge)
+
+    lasso_regr = linear_model.Lasso(alpha=alpha_lasso)
 
     # Split the labels into training and test subsets
     curr_train_labels = train_labels[train_ind]
@@ -565,12 +574,16 @@ for train_ind, test_ind in kf:
     print("fitting SVM\n")
     clf_NB.fit(feat_vec_mat[train_ind, :], curr_train_labels)
     print("fitting NB\n")
-    clf_DT.fit(feat_vec_mat[train_ind, :], curr_train_labels)
-    print("fitting DT\n")
-    clf_KNN.fit(feat_vec_mat[train_ind, :], curr_train_labels)
-    print("fitting KNN\n")
+    # clf_DT.fit(feat_vec_mat[train_ind, :], curr_train_labels)
+    # print("fitting DT\n")
+    # clf_KNN.fit(feat_vec_mat[train_ind, :], curr_train_labels)
+    # print("fitting KNN\n")
     regr.fit(feat_vec_mat[train_ind, :], curr_train_labels)
     print("fitting LR\n")
+    ridge_regr.fit(feat_vec_mat[train_ind, :], curr_train_labels)
+    print("fitting ridge LR\n")
+    lasso_regr.fit(feat_vec_mat[train_ind, :], curr_train_labels)
+    print("fitting ridge LR\n")
 
     # Test the classifiers on the remaining 1/10 of the samples
     # SVC prediction
@@ -584,14 +597,68 @@ for train_ind, test_ind in kf:
     avg_acc_NB += acc
 
     # DecisionTree prediction
-    curr_pred_labels_DT = clf_DT.predict(feat_vec_mat[test_ind, :])
-    acc = metrics.accuracy_score(curr_test_labels, curr_pred_labels_DT)
-    avg_acc_DT += acc
+    # curr_pred_labels_DT = clf_DT.predict(feat_vec_mat[test_ind, :])
+    # acc = metrics.accuracy_score(curr_test_labels, curr_pred_labels_DT)
+    # avg_acc_DT += acc
 
     # KNN prediction
-    curr_pred_labels_KNN = clf_KNN.predict(feat_vec_mat[test_ind, :])
-    acc = metrics.accuracy_score(curr_test_labels, curr_pred_labels_KNN)
-    avg_acc_KNN += acc
+    # curr_pred_labels_KNN = clf_KNN.predict(feat_vec_mat[test_ind, :])
+    # acc = metrics.accuracy_score(curr_test_labels, curr_pred_labels_KNN)
+    # avg_acc_KNN += acc
+
+    # Ridge Linear Regression prediction
+    curr_pred_labels_ridge_regr = ridge_regr.predict(feat_vec_mat[test_ind, :])
+    acc = mean_squared_error(curr_test_labels, curr_pred_labels_ridge_regr)
+    ridge_r2 = r2_score(curr_test_labels, curr_pred_labels_ridge_regr)
+    ridge_mae = mean_absolute_error(curr_test_labels, curr_pred_labels_ridge_regr)
+    mae_ridge_regr += ridge_mae
+    avg_acc_ridge_regr += acc
+    avg_r2_ridge_regr += ridge_r2
+
+    # The coefficients
+    print('RIDGE:\n')
+    print('Coefficients: \n', ridge_regr.coef_)
+    print('Intercept: ',ridge_regr.intercept_)
+    # The mean squared error
+    print("Mean squared error: %.2f"
+          % acc)
+    # Explained variance score: 1 is perfect prediction
+    print('Variance score: %.2f' % ridge_r2)
+
+    # MAE
+    print('MAE score: %.2f' % ridge_mae)
+    print('#########')
+
+
+
+
+    # Ridge Linear Regression prediction
+    curr_pred_labels_lasso_regr = lasso_regr.predict(feat_vec_mat[test_ind, :])
+    acc = mean_squared_error(curr_test_labels, curr_pred_labels_lasso_regr)
+    lasso_r2 = r2_score(curr_test_labels, curr_pred_labels_lasso_regr)
+    lasso_mae = mean_absolute_error(curr_test_labels, curr_pred_labels_lasso_regr)
+    mae_lasso_regr += lasso_mae
+    avg_acc_lasso_regr += acc
+    avg_r2_lasso_regr += lasso_r2
+
+    # The coefficients
+    print('LASSO:\n')
+    print('Coefficients: \n', lasso_regr.coef_)
+    print('Intercept: ',lasso_regr.intercept_)
+    # The mean squared error
+    print("Mean squared error: %.2f"
+          % acc)
+    # Explained variance score: 1 is perfect prediction
+    print('Variance score: %.2f' % lasso_r2)
+
+    # MAE
+    print('MAE score: %.2f' % lasso_mae)
+    print('#########')
+
+
+
+
+
 
     # Linear Regression prediction
     curr_pred_labels_regr = regr.predict(feat_vec_mat[test_ind, :])
@@ -602,6 +669,7 @@ for train_ind, test_ind in kf:
     avg_acc_regr += acc
     avg_r2_regr += r2
 
+    print('Linear Regression:\n')
     # The coefficients
     print('Coefficients: \n', regr.coef_)
     # The mean squared error
@@ -612,6 +680,7 @@ for train_ind, test_ind in kf:
 
     # MAE
     print('MAE score: %.2f' % mae)
+    print('#########')
 
     # Plot outputs
     # plt.scatter(feat_vec_mat[test_ind, 0], curr_test_labels, color='black')
@@ -626,13 +695,24 @@ for train_ind, test_ind in kf:
 
 
 print("--------------")
+print("Batch size (words) is : ",BATCH_SIZE)
 print("SVC Accuracy: " + str(avg_acc_SVC / 10))
 print("NB Accuracy: " + str(avg_acc_NB / 10))
-print("DT Accuracy: " + str(avg_acc_DT / 10))
-print("KNN Accuracy: " + str(avg_acc_KNN / 10))
+# print("DT Accuracy: " + str(avg_acc_DT / 10))
+# print("KNN Accuracy: " + str(avg_acc_KNN / 10))
 print("Linear Regression mse: " + str(avg_acc_regr / 10))
 print("Linear Regression variance (r2) : " + str(avg_r2_regr / 10))
 print("Mean Absolute error : " + str(mae_regr / 10))
-
-
+print("###########\n")
+print("LR WITH REG:\n")
+print("Ridge alpha = ", alpha_ridge)
+print("Ridge Linear Regression mse: " + str(avg_acc_ridge_regr / 10))
+print("Ridge Linear Regression variance (r2) : " + str(avg_r2_ridge_regr / 10))
+print("Ridge Mean Absolute error : " + str(mae_ridge_regr / 10))
+print("--------")
+print("Lasso alpha = ", alpha_lasso)
+print("Lasso Linear Regression mse: " + str(avg_acc_lasso_regr / 10))
+print("Lasso Linear Regression variance (r2) : " + str(avg_r2_lasso_regr / 10))
+print("Lasso Mean Absolute error : " + str(mae_lasso_regr / 10))
+print("--------")
 # -----------------------------------------------------------------------------
