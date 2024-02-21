@@ -52,6 +52,8 @@ With the previous 6 features, a full bag of words was used to support with conte
 | 18  | you   | you   | of    | you   | of    | of    | of    |       |
 | 19  | of    | of    | you   | of    | you   | you   | you   | that  |
 | OLD | is    | is    | is    | is    | is    | it    | it    | you   |
+
+
 Table 2: Most frequent tokens (including reference and function words)
 
 
@@ -72,6 +74,8 @@ Table 2: Most frequent tokens (including reference and function words)
 | all | it’s   | i     | up   | people| one    | from   | because|
 | out | out    | don’t  | know | think| really | really | one   |
 | not | The    | about  | good | an   | from   | about  | he    |
+
+
 Table 3: Most interesting words among top50 frequent words (without order)
 
 #### Results
