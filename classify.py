@@ -5,7 +5,6 @@ import pickle
 import shutil
 import string
 from collections import OrderedDict
-
 import matplotlib.pyplot as plt
 import nltk
 import operator
@@ -20,6 +19,10 @@ from sklearn import feature_extraction
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.multiclass import OneVsRestClassifier, OneVsOneClassifier
 from sklearn.feature_selection import SelectKBest, chi2
+from sklearn.model_selection import cross_val_predict
+from sklearn import linear_model
+from sklearn.preprocessing import MinMaxScaler
+
 from en_shell_nouns import SHELL_NOUNS
 from en_function_words import FUNCTION_WORDS
 
@@ -44,59 +47,6 @@ def getInd(src:list,num):
     for ind,val in src:
         if num in val:
             return ind
-
-# from each class , choose NUM_OF_SAMPLES  - each sample is a batch at size BATCH_SIZE (BATCH_SIZE sentences)
-# def pickSamples(input_path):
-#     dir_files = os.listdir(input_path)
-#     tknzr = TweetTokenizer()
-#
-#     if os.path.exists(input_path + "\\batched\\"):
-#         shutil.rmtree(input_path + "\\batched\\")
-#         os.makedirs(input_path + "\\batched\\")
-#     else:
-#         os.makedirs(input_path + "\\batched\\")
-#     for file in dir_files:
-#         batches = []
-#         if file.endswith(".merged"):
-#             # saving to file , mainly for debug
-#
-#             # new file - each line at the file will contain a batch (certain number of sentences)
-#             sents = codecs.open(input_path + "\\batched\\" + file + ".batched", 'w', "utf-8")
-#             # source file
-#             src = codecs.open(input_path + "\\" + file, 'r',"utf-8")
-#
-#             file_len = 0
-#             batch_ind = 0
-#             all_batch_ind = 0
-#             for line in src:
-#                 file_len += 1
-#                 if file_len == 99242:
-#                     print()
-#
-#             t = [i for i in range(file_len)]
-#
-#             num_of_possible_batches = int(file_len / BATCH_SIZE)
-#
-#             # generate a list (of lists) holding the lines to be batched
-#             for i in range(num_of_possible_batches):
-#                 # choose sentences indices from file, uniformly
-#                 indices_to_choose = sorted(choice(t, BATCH_SIZE, replace=False))
-#                 batches.append(indices_to_choose)
-#                 removeIndices(t, indices_to_choose)
-#
-#             batched_lines = [""]*num_of_possible_batches
-#             for index, line in enumerate(src):
-#                 current_batch_line_number = getInd(batches,index)
-#                 batched_lines[current_batch_line_number].join(line)
-#
-#
-#             for i in range(len(batched_lines)):
-#                 sents.write(batched_lines[i])
-#
-#             src.close()
-
-
-# pickSamples("jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\mergedFiles\\")
 
 
 # making batches and returning the lowest number of batches generated for downsampling later
@@ -363,12 +313,7 @@ def get_tokens(text):
 
 def analyze_text(input_file):
     sentences = codecs.open(input_file, 'r', "utf-8")
-
-
-
-
     # sentences = text.split("\n")  # split the text into sentences to avoid line breaks
-
     for s in sentences:
         sent_tokens = get_tokens(s)
 
@@ -427,7 +372,7 @@ shortest_batch = min([len(master_of_batches[i]) for i in range(len(master_of_bat
 print(shortest_batch)
 all_ages_batched = getBatches("jsons\\texts\\splitsentsNLTKstyle\\cleanSents\\mergedFiles\\batched",shortest_batch)
 
-# pickle.dump(all_ages_batched, open('all_ages_batched.p', 'wb'))
+pickle.dump(all_ages_batched, open('all_ages_batched.p', 'wb'))
 
 # use this line when working only , to use previous pickle. otherwise , comment it and uncomment previous lines (not pickle)
 # all_ages_batched = pickle.load(open('all_ages_batched.p', "rb"))
@@ -471,12 +416,7 @@ all_mighty_dict_size = len(analyze_text.unigrams_dict)
 feature_len = 6 + len(top_500_in_dict)
 feat_vec_mat = np.zeros((len(all_ages_batched[0])*NUM_OF_CLASSES, feature_len))
 
-
-
-
 REFERENCES = ["I", "me", "mine", "you", "your", "we", "our", "him", "her", "they"]
-
-
 
 def featureVecotrize(batch):
     # global debug_procces_words
@@ -524,11 +464,6 @@ def featureVecotrize(batch):
     return vect
 
 
-
-
-
-
-
 vect_num = 0
 # fill feature matrix
 for age,batch_age in enumerate(all_ages_batched):
@@ -540,29 +475,37 @@ for age,batch_age in enumerate(all_ages_batched):
         for ft_index in range(len(vect)):
             feat_vec_mat[batch_index + len(all_ages_batched[0])*age][ft_index] = vect[ft_index]
 
+pickle.dump(feat_vec_mat, open('feat_vec_mat.p', 'wb'))
+
+
+#
+# feat_vec_mat = pickle.load(open('feat_vec_mat.p', 'rb'))
+
+# Optional scaling
+#scaler = MinMaxScaler()
+#feat_vec_mat = scaler.fit(feat_vec_mat).transform(feat_vec_mat)
+#print('done scaling')
 
 # X_new = SelectKBest(chi2, k=20).fit_transform(feat_vec_mat, train_labels)
-
 
 # 10-fold cross validation
 kf = cross_validation.KFold(len(all_ages_batched)*len(all_ages_batched[0]), n_folds=10, shuffle=True)
 avg_acc_SVC = avg_acc_NB = avg_acc_DT = avg_acc_KNN = avg_acc_regr = avg_r2_regr = mae_regr = 0
 avg_acc_lasso_regr = avg_r2_lasso_regr = mae_lasso_regr = avg_acc_ridge_regr = avg_r2_ridge_regr = mae_ridge_regr = 0
 
-alpha_lasso = 0.1
-alpha_ridge = .5
+alpha_lasso = 0.3
+alpha_ridge = .7
 
 for train_ind, test_ind in kf:
 
     clf_SVC = OneVsOneClassifier(svm.LinearSVC())
     clf_NB = OneVsOneClassifier(naive_bayes.MultinomialNB())
-    # clf_DT = OneVsOneClassifier(tree.DecisionTreeClassifier())
-    # clf_KNN = OneVsOneClassifier(neighbors.KNeighborsClassifier())
+    clf_DT = OneVsOneClassifier(tree.DecisionTreeClassifier())
+    clf_KNN = OneVsOneClassifier(neighbors.KNeighborsClassifier())
     regr = linear_model.LinearRegression()
 
-
     ridge_regr = linear_model.Ridge(alpha=alpha_ridge)
-
+    
     lasso_regr = linear_model.Lasso(alpha=alpha_lasso)
 
     # Split the labels into training and test subsets
@@ -574,10 +517,10 @@ for train_ind, test_ind in kf:
     print("fitting SVM\n")
     clf_NB.fit(feat_vec_mat[train_ind, :], curr_train_labels)
     print("fitting NB\n")
-    # clf_DT.fit(feat_vec_mat[train_ind, :], curr_train_labels)
-    # print("fitting DT\n")
-    # clf_KNN.fit(feat_vec_mat[train_ind, :], curr_train_labels)
-    # print("fitting KNN\n")
+    clf_DT.fit(feat_vec_mat[train_ind, :], curr_train_labels)
+    print("fitting DT\n")
+    clf_KNN.fit(feat_vec_mat[train_ind, :], curr_train_labels)
+    print("fitting KNN\n")
     regr.fit(feat_vec_mat[train_ind, :], curr_train_labels)
     print("fitting LR\n")
     ridge_regr.fit(feat_vec_mat[train_ind, :], curr_train_labels)
@@ -597,14 +540,14 @@ for train_ind, test_ind in kf:
     avg_acc_NB += acc
 
     # DecisionTree prediction
-    # curr_pred_labels_DT = clf_DT.predict(feat_vec_mat[test_ind, :])
-    # acc = metrics.accuracy_score(curr_test_labels, curr_pred_labels_DT)
-    # avg_acc_DT += acc
+    curr_pred_labels_DT = clf_DT.predict(feat_vec_mat[test_ind, :])
+    acc = metrics.accuracy_score(curr_test_labels, curr_pred_labels_DT)
+    avg_acc_DT += acc
 
     # KNN prediction
-    # curr_pred_labels_KNN = clf_KNN.predict(feat_vec_mat[test_ind, :])
-    # acc = metrics.accuracy_score(curr_test_labels, curr_pred_labels_KNN)
-    # avg_acc_KNN += acc
+    curr_pred_labels_KNN = clf_KNN.predict(feat_vec_mat[test_ind, :])
+    acc = metrics.accuracy_score(curr_test_labels, curr_pred_labels_KNN)
+    avg_acc_KNN += acc
 
     # Ridge Linear Regression prediction
     curr_pred_labels_ridge_regr = ridge_regr.predict(feat_vec_mat[test_ind, :])
@@ -621,7 +564,7 @@ for train_ind, test_ind in kf:
     print('Intercept: ',ridge_regr.intercept_)
     # The mean squared error
     print("Mean squared error: %.2f"
-          % acc)
+           % acc)
     # Explained variance score: 1 is perfect prediction
     print('Variance score: %.2f' % ridge_r2)
 
@@ -630,9 +573,7 @@ for train_ind, test_ind in kf:
     print('#########')
 
 
-
-
-    # Ridge Linear Regression prediction
+    # Lasso Linear Regression prediction
     curr_pred_labels_lasso_regr = lasso_regr.predict(feat_vec_mat[test_ind, :])
     acc = mean_squared_error(curr_test_labels, curr_pred_labels_lasso_regr)
     lasso_r2 = r2_score(curr_test_labels, curr_pred_labels_lasso_regr)
@@ -650,16 +591,11 @@ for train_ind, test_ind in kf:
           % acc)
     # Explained variance score: 1 is perfect prediction
     print('Variance score: %.2f' % lasso_r2)
-
+    
     # MAE
     print('MAE score: %.2f' % lasso_mae)
     print('#########')
-
-
-
-
-
-
+    
     # Linear Regression prediction
     curr_pred_labels_regr = regr.predict(feat_vec_mat[test_ind, :])
     acc = mean_squared_error(curr_test_labels, curr_pred_labels_regr)
@@ -683,6 +619,12 @@ for train_ind, test_ind in kf:
     print('#########')
 
     # Plot outputs
+    # plt.plot(curr_test_labels,curr_pred_labels_regr,".")
+    # plt.title("Predicted vs Actual")
+    # plt.xlabel("Actual")
+    # plt.ylabel("Predicted")
+    # plt.show()
+
     # plt.scatter(feat_vec_mat[test_ind, 0], curr_test_labels, color='black')
     # plt.plot(feat_vec_mat[test_ind, :], curr_pred_labels_regr, color='blue', linewidth=3)
 
@@ -692,14 +634,12 @@ for train_ind, test_ind in kf:
     # plt.show()
 
 
-
-
 print("--------------")
 print("Batch size (words) is : ",BATCH_SIZE)
 print("SVC Accuracy: " + str(avg_acc_SVC / 10))
 print("NB Accuracy: " + str(avg_acc_NB / 10))
-# print("DT Accuracy: " + str(avg_acc_DT / 10))
-# print("KNN Accuracy: " + str(avg_acc_KNN / 10))
+print("DT Accuracy: " + str(avg_acc_DT / 10))
+print("KNN Accuracy: " + str(avg_acc_KNN / 10))
 print("Linear Regression mse: " + str(avg_acc_regr / 10))
 print("Linear Regression variance (r2) : " + str(avg_r2_regr / 10))
 print("Mean Absolute error : " + str(mae_regr / 10))
@@ -715,4 +655,19 @@ print("Lasso Linear Regression mse: " + str(avg_acc_lasso_regr / 10))
 print("Lasso Linear Regression variance (r2) : " + str(avg_r2_lasso_regr / 10))
 print("Lasso Mean Absolute error : " + str(mae_lasso_regr / 10))
 print("--------")
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
+
+lr = linear_model.LinearRegression()
+y = train_labels
+
+# cross_val_predict returns an array of the same size as `y` where each entry
+# is a prediction obtained by cross validation:
+predicted = cross_val_predict(lr, feat_vec_mat, y, cv=10)
+
+fig, ax = plt.subplots()
+ax.scatter(y, predicted, edgecolors=(0, 0, 0))
+ax.plot([y.min(), y.max()], [y.min(), y.max()], 'k--', lw=4)
+ax.set_xlabel('Measured')
+ax.set_ylabel('Predicted')
+plt.show()
+
